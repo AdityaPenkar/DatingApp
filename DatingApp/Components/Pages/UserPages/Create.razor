@@ -1,0 +1,79 @@
+﻿@page "/users/create"
+@using Microsoft.EntityFrameworkCore
+@using DatingAppFSDProject.Domain
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>User</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="User" OnValidSubmit="AddUser" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email:</label> 
+                <InputText id="email" @bind-Value="User.Email" class="form-control" /> 
+                <ValidationMessage For="() => User.Email" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="password" class="form-label">Password:</label> 
+                <InputText id="password" @bind-Value="User.Password" class="form-control" /> 
+                <ValidationMessage For="() => User.Password" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="name" class="form-label">Name:</label> 
+                <InputText id="name" @bind-Value="User.Name" class="form-control" /> 
+                <ValidationMessage For="() => User.Name" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="gender" class="form-label">Gender:</label> 
+                <InputText id="gender" @bind-Value="User.Gender" class="form-control" /> 
+                <ValidationMessage For="() => User.Gender" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="dateofbirth" class="form-label">DateOfBirth:</label> 
+                <InputDate id="dateofbirth" @bind-Value="User.DateOfBirth" class="form-control" /> 
+                <ValidationMessage For="() => User.DateOfBirth" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="location" class="form-label">Location:</label> 
+                <InputText id="location" @bind-Value="User.Location" class="form-control" /> 
+                <ValidationMessage For="() => User.Location" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="biography" class="form-label">Biography:</label> 
+                <InputText id="biography" @bind-Value="User.Biography" class="form-control" /> 
+                <ValidationMessage For="() => User.Biography" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="interests" class="form-label">Interests:</label> 
+                <InputText id="interests" @bind-Value="User.Interests" class="form-control" /> 
+                <ValidationMessage For="() => User.Interests" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/users">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private User User { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddUser()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.User.Add(User);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/users");
+    }
+}

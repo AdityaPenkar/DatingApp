@@ -1,0 +1,238 @@
+﻿@page "/Account/Register"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using DatingApp.Data
+
+@inject UserManager<DatingAppUser> UserManager
+@inject IUserStore<DatingAppUser> UserStore
+@inject SignInManager<DatingAppUser> SignInManager
+@inject IEmailSender<DatingAppUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<PageTitle>Register</PageTitle>
+
+<h1>Register</h1>
+
+<div class="row">
+    <div class="col-md-4">
+        <StatusMessage Message="@Message" />
+        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <DataAnnotationsValidator />
+            <h2>Create a new account.</h2>
+            <hr />
+            <ValidationSummary class="text-danger" role="alert" />
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <label for="email">Email</label>
+                <ValidationMessage For="() => Input.Email" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FirstName" class="form-control" autocomplete="firstname" aria-required="true" placeholder="First Name" />
+                <label for="firstname">FirstName</label>
+                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.LastName" class="form-control" autocomplete="lastname" aria-required="true" placeholder="Last Name" />
+                <label for="lastname">LastName</label>
+                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+            </div>
+
+            <!-- Gender Selection -->
+            <div class="form-floating mb-3">
+                <InputSelect @bind-Value="Input.Gender" class="form-control" autocomplete="gender" aria-required="true" placeholder="Gender">
+                    <option value="">Select Gender</option>
+                    <option value="@GenderType.Male">Male</option>
+                    <option value="@GenderType.Female">Female</option>
+                    <option value="@GenderType.Other">Other</option>
+                </InputSelect>
+                <label for="gender">Gender</label>
+                <ValidationMessage For="() => Input.Gender" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputDate @bind-Value="Input.DateOfBirth" class="form-control"
+                           Min="1900-01-01"
+                           Max="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                <label for="dob">Date of Birth</label>
+                <ValidationMessage For="() => Input.DateOfBirth" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="password">Password</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="confirm-password">Confirm Password</label>
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
+        </EditForm>
+    </div>
+    <div class="col-md-6 col-md-offset-2">
+        <section>
+            <h3>Use another service to register.</h3>
+            <hr />
+            <ExternalLoginPicker />
+        </section>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        var user = CreateUser();
+
+        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
+        user.FirstName = Input.FirstName;
+        user.LastName = Input.LastName;
+        user.Gender = Input.Gender.ToString();
+        user.Email = Input.Email;
+        user.Password = Input.Password;
+        user.DateOfBirth = Input.DateOfBirth;
+
+        var today = DateTime.Today;
+        var age = today.Year - Input.DateOfBirth.Year;
+        if (Input.DateOfBirth.Date > today.AddYears(-age)) age--; // Adjust for birthdate not yet reached this year
+
+        // Check if user is under 18
+        if (age < 18)
+        {
+            identityErrors = new List<IdentityError>
+        {
+            new IdentityError { Description = "You must be at least 18 years old to create an account." }
+        };
+            return;
+        }
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
+        {
+            identityErrors = result.Errors;
+            return;
+        }
+        //create the user role if it doesn't exist
+        if (!await RoleManager.RoleExistsAsync("User"))
+        {
+            await RoleManager.CreateAsync(new IdentityRole("User"));
+        }
+        //add the user to the user role
+        await UserManager.AddToRoleAsync(user, "User");
+        //add the user id as claim when user registers
+        await UserManager.AddClaimAsync(user, new System.Security.Claims.Claim("userId", user.Id));
+
+        Logger.LogInformation("User created a new account with password.");
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        {
+            RedirectManager.RedirectTo(
+                "Account/RegisterConfirmation",
+                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+        }
+
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        RedirectManager.RedirectTo(ReturnUrl);
+    }
+
+    private DatingAppUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<DatingAppUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(DatingAppUser)}'. " +
+                $"Ensure that '{nameof(DatingAppUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<DatingAppUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<DatingAppUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Text)]
+        [Display(Name = "FirstName")]
+        public string FirstName { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Text)]
+        [Display(Name = "LastName")]
+        public string LastName { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Text)]
+        [Display(Name = "Gender")]
+        public GenderType Gender { get; set; } = GenderType.Male;
+
+        [Required]
+        [DataType(DataType.Date)] // Ensures the date picker is used in the UI
+        [Display(Name = "Date of Birth")]
+        public DateTime DateOfBirth { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+
+    public enum GenderType
+    {
+        Male,
+        Female,
+        Other
+    }
+}
+
+

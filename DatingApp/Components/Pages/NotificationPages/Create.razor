@@ -1,0 +1,64 @@
+﻿@page "/notifications/create"
+@using Microsoft.EntityFrameworkCore
+@using DatingAppFSDProject.Domain
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Notification</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Notification" OnValidSubmit="AddNotification" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="content" class="form-label">Content:</label> 
+                <InputText id="content" @bind-Value="Notification.Content" class="form-control" /> 
+                <ValidationMessage For="() => Notification.Content" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="isread" class="form-label">IsRead:</label> 
+                <InputCheckbox id="isread" @bind-Value="Notification.IsRead" class="form-check-input" /> 
+                <ValidationMessage For="() => Notification.IsRead" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="timerecived" class="form-label">TimeRecived:</label> 
+                <InputDate id="timerecived" @bind-Value="Notification.TimeRecived" class="form-control" /> 
+                <ValidationMessage For="() => Notification.TimeRecived" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="userid" class="form-label">UserId:</label> 
+                <InputNumber id="userid" @bind-Value="Notification.UserId" class="form-control" /> 
+                <ValidationMessage For="() => Notification.UserId" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="messageid" class="form-label">MessageId:</label> 
+                <InputNumber id="messageid" @bind-Value="Notification.MessageId" class="form-control" /> 
+                <ValidationMessage For="() => Notification.MessageId" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/notifications">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Notification Notification { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddNotification()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Notification.Add(Notification);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/notifications");
+    }
+}

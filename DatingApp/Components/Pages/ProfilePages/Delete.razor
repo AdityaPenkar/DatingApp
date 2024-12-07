@@ -1,0 +1,67 @@
+﻿@page "/profiles/delete"
+@using Microsoft.EntityFrameworkCore
+@using DatingAppFSDProject.Domain
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Profile</h2>
+    <hr />
+    @if (profile is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Visible</dt>
+            <dd class="col-sm-10">@profile.Visible</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">BlockedUser</dt>
+            <dd class="col-sm-10">@profile.BlockedUser</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UserId</dt>
+            <dd class="col-sm-10">@profile.UserId</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">SettingId</dt>
+            <dd class="col-sm-10">@profile.SettingId</dd>
+        </dl>
+        <EditForm method="post" Model="profile" OnValidSubmit="DeleteProfile" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(profile is null)">Delete</button> |
+            <a href="/profiles">Back to List</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Profile? profile;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        profile = await context.Profile.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (profile is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteProfile()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Profile.Remove(profile!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/profiles");
+    }
+}

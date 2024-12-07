@@ -1,0 +1,104 @@
+﻿@page "/settings/edit"
+@using Microsoft.EntityFrameworkCore
+@using DatingAppFSDProject.Domain
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Setting</h2>
+<hr />
+@if (Setting is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Setting" OnValidSubmit="UpdateSetting" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Setting.Id" value="@Setting.Id" />
+                <div class="mb-3">
+                    <label for="notificationpreference" class="form-label">NotificationPreference:</label>
+                    <InputText id="notificationpreference" @bind-Value="Setting.NotificationPreference" class="form-control" />
+                    <ValidationMessage For="() => Setting.NotificationPreference" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="privacysetting" class="form-label">PrivacySetting:</label>
+                    <InputText id="privacysetting" @bind-Value="Setting.PrivacySetting" class="form-control" />
+                    <ValidationMessage For="() => Setting.PrivacySetting" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="themepreference" class="form-label">ThemePreference:</label>
+                    <InputText id="themepreference" @bind-Value="Setting.ThemePreference" class="form-control" />
+                    <ValidationMessage For="() => Setting.ThemePreference" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="userid" class="form-label">UserId:</label>
+                    <InputNumber id="userid" @bind-Value="Setting.UserId" class="form-control" />
+                    <ValidationMessage For="() => Setting.UserId" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/settings">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private Setting? Setting { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Setting ??= await context.Setting.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (Setting is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateSetting()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Setting!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!SettingExists(Setting!.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/settings");
+    }
+
+    private bool SettingExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Setting.Any(e => e.Id == id);
+    }
+}

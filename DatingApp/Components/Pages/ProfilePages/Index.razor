@@ -1,0 +1,39 @@
+﻿@page "/profiles"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using DatingAppFSDProject.Domain
+@using DatingApp.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+
+<PageTitle>Index</PageTitle>
+
+<h1>Index</h1>
+
+<p>
+    <a href="profiles/create">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Profile">
+    <PropertyColumn Property="profile => profile.Visible" />
+    <PropertyColumn Property="profile => profile.BlockedUser" />
+    <PropertyColumn Property="profile => profile.UserId" />
+    <PropertyColumn Property="profile => profile.SettingId" />
+
+    <TemplateColumn Context="profile">
+        <a href="@($"profiles/edit?id={profile.Id}")">Edit</a> |
+        <a href="@($"profiles/details?id={profile.Id}")">Details</a> |
+        <a href="@($"profiles/delete?id={profile.Id}")">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private DatingAppContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

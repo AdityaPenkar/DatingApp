@@ -1,0 +1,104 @@
+﻿@page "/messages/edit"
+@using Microsoft.EntityFrameworkCore
+@using DatingAppFSDProject.Domain
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Message</h2>
+<hr />
+@if (Message is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Message" OnValidSubmit="UpdateMessage" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Message.Id" value="@Message.Id" />
+                <div class="mb-3">
+                    <label for="content" class="form-label">Content:</label>
+                    <InputText id="content" @bind-Value="Message.Content" class="form-control" />
+                    <ValidationMessage For="() => Message.Content" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="userid1" class="form-label">UserId1:</label>
+                    <InputNumber id="userid1" @bind-Value="Message.UserId1" class="form-control" />
+                    <ValidationMessage For="() => Message.UserId1" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="messageboxid" class="form-label">MessageBoxId:</label>
+                    <InputNumber id="messageboxid" @bind-Value="Message.MessageBoxId" class="form-control" />
+                    <ValidationMessage For="() => Message.MessageBoxId" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="userid2" class="form-label">UserId2:</label>
+                    <InputNumber id="userid2" @bind-Value="Message.UserId2" class="form-control" />
+                    <ValidationMessage For="() => Message.UserId2" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/messages">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private Message? Message { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Message ??= await context.Message.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (Message is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateMessage()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Message!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!MessageExists(Message!.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/messages");
+    }
+
+    private bool MessageExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Message.Any(e => e.Id == id);
+    }
+}
