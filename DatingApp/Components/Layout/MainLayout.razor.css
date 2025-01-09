@@ -94,3 +94,19 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+.title-container {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 auto;
+    text-align: center;
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
