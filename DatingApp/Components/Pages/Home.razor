@@ -1,6 +1,21 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 
 <PageTitle>Home</PageTitle>
 
-<h1 class="welcome-text">Find Your Perfect Match 💕</h1>
-<p class="subtext">Join our community of singles looking for love, connection, and fun.</p>
+<div class="home-container">
+    <h1 class="welcome-text">Find Your Perfect Match 💕</h1>
+    <p class="subtext">Join our community of singles looking for love, connection, and fun.</p>
+    <button @onclick="NavigateToProfiles" class="find-buddy-btn">Match</button>
+
+</div>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; }
+
+    private void NavigateToProfiles()
+    {
+        Console.WriteLine("Navigating to profiles..."); // Check if it's being triggered
+        Navigation.NavigateTo("/profilesMatches");
+    }
+}

@@ -1,0 +1,180 @@
+﻿@page "/ProfileSetup"
+@inject NavigationManager Navigation
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<DatingAppUser> UserManager
+@inject ILogger<ProfileSetup> Logger
+@rendermode InteractiveServer
+@inject ILocalStorageService LocalStorageService
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.Security.Claims;
+@inject DatingAppContext _context
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IServiceScopeFactory ServiceScopeFactory
+
+<PageTitle>Settings</PageTitle>
+
+<div class="settings-container">
+    <h2>@Username</h2>
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <div class="status-message">@StatusMessage</div>
+    }
+
+    <div class="profile-section">
+        <div class="image-preview">
+            <img id="profileImagePreview" src="@ProfileImageUrl" alt="Profile Image">
+        </div>
+        <InputFile id="profileImageInput" OnChange="HandleImageUpload" Accept="image/jpeg,image/png,image/jpg" />
+        <label for="profileImageInput" class="change-image-btn">Change Image</label>
+    </div>
+
+    <!-- Gender Selection -->
+    <div class="bio-section">
+        <label>Bio:</label>
+        <textarea id="bioInput" @bind="Bio"></textarea>
+    </div>
+
+    <button class="save-btn" @onclick="SaveChanges">Save Changes</button>
+</div>
+
+
+@code {
+    private DatingAppUser currentUser { get; set; }
+    private string? ProfileImageUrl { get; set; }
+    private string? Bio { get; set; }
+    private IFormFile? ProfileImage { get; set; }
+    private string StatusMessage { get; set; } = string.Empty;
+    private string? Username { get; set; }
+    private string? Gender { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        string email = "";
+        if (HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated)
+        {
+            email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
+        }
+
+        currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
+
+        if (currentUser != null)
+        {
+            Username = currentUser.FirstName + " " + currentUser.LastName;
+            Bio = currentUser.Bio;
+            ProfileImageUrl = $"/Uploads/Images/{currentUser.ProfileImageUrl}?v={DateTime.Now.Ticks}";
+        }
+    }
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+
+            if (file != null)
+            {
+                var fileExtension = Path.GetExtension(file.Name).ToLower();
+                if (fileExtension != ".jpg" && fileExtension != ".jpeg" && fileExtension != ".png")
+                {
+                    Console.WriteLine("Invalid file type. Only .jpg, .jpeg, and .png files are allowed.");
+                    return;
+                }
+
+                var directoryPath = Path.Combine("wwwroot", "Uploads", "Images");
+                var filePath = Path.Combine(directoryPath, $"{currentUser.Id}.jpg");
+
+                // Check if the file already exists and delete it
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    Console.WriteLine("Old profile image deleted.");
+                }
+
+                // Ensure the directory exists before saving the file
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                using var stream = new FileStream(filePath, FileMode.Create);
+                await file.OpenReadStream().CopyToAsync(stream);
+
+                // Force UI update by appending a timestamp to bypass browser cache
+                ProfileImageUrl = $"/Uploads/Images/{currentUser.Id}.jpg?v={DateTime.Now.Ticks}";
+
+                Console.WriteLine("New profile image uploaded successfully.");
+
+                // Trigger UI update
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading image: {ex.Message}");
+        }
+    }
+    public async Task DeleteAllRecordsAsync()
+    {
+        using (var scope = ServiceScopeFactory.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+
+            foreach (var entityType in dbContext.Model.GetEntityTypes())
+            {
+                var entityClrType = entityType.ClrType;
+                if (entityClrType != null)
+                {
+                    var dbSet = dbContext.GetType()
+                        .GetMethod("Set")?
+                        .MakeGenericMethod(entityClrType)
+                        .Invoke(dbContext, null);
+
+                    if (dbSet != null)
+                    {
+                        var removeRangeMethod = typeof(DbContext).GetMethod("RemoveRange", new Type[] { typeof(IEnumerable<>)!.MakeGenericType(entityClrType) });
+
+                        if (removeRangeMethod != null)
+                        {
+                            var entities = dbSet.GetType().GetMethod("ToList")?.Invoke(dbSet, null);
+                            removeRangeMethod.Invoke(dbContext, new object[] { entities });
+                        }
+                    }
+                }
+            }
+
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+
+
+    private async Task SaveChanges()
+    {
+        try
+        {
+            if (currentUser != null)
+            {
+                currentUser.Bio = Bio;
+                if (!string.IsNullOrEmpty(ProfileImageUrl))
+                {
+                    currentUser.ProfileImageUrl = $"{currentUser.Id}.jpg";
+                }
+
+                await UserManager.UpdateAsync(currentUser);
+                StatusMessage = "Changes saved successfully!";
+                // Optionally, clear the message after a few seconds
+                await Task.Delay(3000); // Wait for 3 seconds
+                StatusMessage = string.Empty; // Clear the message
+                Logger.LogInformation("Profile updated.");
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "An error occurred while saving changes.";
+        }
+        
+    }
+}

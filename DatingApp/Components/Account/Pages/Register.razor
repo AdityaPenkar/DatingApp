@@ -112,6 +112,11 @@
         user.Email = Input.Email;
         user.Password = Input.Password;
         user.DateOfBirth = Input.DateOfBirth;
+        user.isDeleted = false;
+        var isFirstAccount = UserManager.Users.Any();
+        user.Role = isFirstAccount ? "User" : "Admin";
+        user.ProfileImageUrl = user.Gender == "Male" ? "boy.png" : "girl.png";
+        user.Bio = "Passionate about love and connection.";
 
         var today = DateTime.Today;
         var age = today.Year - Input.DateOfBirth.Year;

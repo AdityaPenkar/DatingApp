@@ -4,11 +4,16 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Authentication.Cookies;
 
 @inject SignInManager<DatingAppUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILocalStorageService LocalStorageService
 
 <PageTitle>Log in</PageTitle>
 
@@ -90,10 +95,39 @@
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        Logger.LogInformation("User logged in.1");
+
         if (result.Succeeded)
         {
-            Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+            var user = SignInManager.UserManager.Users.FirstOrDefault(s => s.Email == Input.Email);
+            if (user != null && user.isDeleted == false)
+            {
+                var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name, Input.Email)
+        };
+
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
+                    new AuthenticationProperties
+                        {
+                            IsPersistent = Input.RememberMe
+                        });
+
+                // Redirect to Home after login
+                NavigationManager.NavigateTo("/");
+                Logger.LogInformation("User logged in.");
+                // Update authentication state on successful login
+                // await LocalStorageService.SetItemAsync("userEmail", Input.Email);
+
+                // RedirectManager.RedirectTo(ReturnUrl);
+            }
+            else
+            {
+                errorMessage = "Error: Invalid login attempt.";
+            }
         }
         else if (result.RequiresTwoFactor)
         {

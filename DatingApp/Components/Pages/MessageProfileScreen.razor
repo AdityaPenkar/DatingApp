@@ -1,0 +1,417 @@
+﻿@* @page "/messagesProfileScreen"
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.Security.Claims;
+@inject IServiceScopeFactory ServiceScopeFactory
+@inject UserManager<DatingAppUser> UserManager
+
+
+<PageTitle>Messages</PageTitle>
+
+<div class="message-container">
+    <div class="profile-list">
+        <h3>Profiles</h3>
+        @foreach (var profile in ProfilesList)
+        {
+            <div class="profile-item" @onclick="() => SelectProfile(profile)">
+                <a @onclick="() => SelectProfile(profile)">
+                <img src="@profile.ImageUrl" alt="Profile Image" class="profile-icon" />
+                <h4>@profile.Name</h4>
+                </a>
+            </div>
+        }
+    </div>
+    <div class="profile-list">
+        <h3>Request @friendRequest.Count</h3>
+        @foreach (var profile in friendRequest)
+        {
+            <div class="profile-item">
+                <h4>@profile.SenderId</h4>
+                <h4>@profile.ReceiverId</h4>
+            </div>
+        }
+    </div>
+
+    @if (SelectedProfile != null)
+    {
+        <div class="chat-section">
+            <div class="chat-header">
+                <h4>@SelectedProfile.Name</h4>
+                <div class="request-actions">
+                    <button class="accept-btn" @onclick="AcceptRequest" disabled="@IsRequestAccepted">Accept</button>
+                    <button class="reject-btn" @onclick="RejectRequest" disabled="@IsRequestAccepted">Reject</button>
+                </div>
+            </div>
+
+            <div class="chat-messages">
+                @foreach (var message in ChatMessages)
+                {
+                    <div class="message">
+                        <p><strong>@message.Sender:</strong> @message.Content</p>
+                    </div>
+                }
+            </div>
+
+            <div class="message-input">
+                <input type="text" @bind="NewMessage" placeholder="Type a message" disabled="@(!IsRequestAccepted)" />
+                <button @onclick="SendMessage" disabled="@(!IsRequestAccepted)">Send</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p>Select a profile to start chatting. @ProfilesList[0].Name</p>
+        <p> @trigger</p>
+    }
+</div>
+
+@code {
+    private List<Profile> ProfilesList = new()
+    {
+        new Profile { Name = "Emma", ImageUrl = "/Uploads/boy1.jpg" },
+        new Profile { Name = "John", ImageUrl = "/Uploads/boy1.jpg" },
+        new Profile { Name = "Billal", ImageUrl = "/Uploads/boy1.jpg" }
+    };
+
+    private Profile? SelectedProfile { get; set; }
+    private string NewMessage { get; set; }
+    private string trigger { get; set; }
+    private List<Message> ChatMessages { get; set; } = new();
+    private List<ConnectionRequest> friendRequest { get; set; } = new();
+    private bool IsRequestAccepted { get; set; } = false;
+    protected override async Task OnInitializedAsync()
+    {
+        string email = "";
+        if (HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated)
+        {
+            email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
+        }
+        using (var scope = ServiceScopeFactory.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+            var currentUser = await UserManager.Users.FirstOrDefaultAsync(x=>x.Email==email); // Fetch all users
+            friendRequest = await dbContext.ConnectionRequests.ToListAsync();
+                                               // .Where(r => (r.SenderId == currentUser.Id && r.ReceiverId == currentUser.Id) && r.Status == RequestStatus.Default).ToListAsync();
+
+            // if (existingRequest == null)
+            // {
+            //     var newRequest = new ConnectionRequest
+            //         {
+            //             SenderId = senderId,
+            //             ReceiverId = receiverId,
+            //             Status = RequestStatus.Default
+            //         };
+
+            // }
+        }
+
+    }
+    private void SelectProfile(Profile profile)
+    {
+        trigger = "yes";
+        SelectedProfile = profile;
+        ChatMessages.Clear(); // Clear messages when a new profile is selected
+    }
+
+    private void AcceptRequest()
+    {
+        IsRequestAccepted = true;
+    }
+
+    private void RejectRequest()
+    {
+        IsRequestAccepted = false;
+        SelectedProfile = null; // Clear the selected profile when rejected
+    }
+
+    private void SendMessage()
+    {
+        if (!string.IsNullOrEmpty(NewMessage) && SelectedProfile != null)
+        {
+            ChatMessages.Add(new Message
+                {
+                    Sender = "You",
+                    Content = NewMessage
+                });
+            NewMessage = ""; // Clear the input after sending
+        }
+    }
+
+    public class Profile
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+
+    public class Message
+    {
+        public string Sender { get; set; }
+        public string Content { get; set; }
+    }
+}
+ *@
+
+ @page "/messagesProfileScreen"
+@inject NavigationManager Navigation
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<DatingAppUser> UserManager
+@inject ILogger<MessageProfileScreen> Logger
+@rendermode InteractiveServer
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.Security.Claims;
+@inject DatingAppContext _context
+
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IServiceScopeFactory ServiceScopeFactory
+
+
+<PageTitle>Messages</PageTitle>
+
+
+<div class="messages-container">
+    <!-- Left Side (Profiles) -->
+    @if (FriendsList.Count > 0)
+    {
+        <div class="profile-list">
+            @foreach (var friend in FriendsList)
+            {
+                <div class="profile-item" @onclick="() => LoadChat(friend)">
+                    <img src="@friend.ProfileImage" alt="Profile Image" class="profile-icon">
+                    <span>@friend.FriendName</span>
+                </div>
+            }
+        </div>
+    }
+    <!-- Right Side (Chat Window) -->
+    <div class="chat-window">
+        @if (selectedFriend != null)
+        {
+            <div class="chat-header">
+                <img src="@selectedFriend.ProfileImage" alt="Profile" class="profile-pic-m" />
+                <span class="chat-name">@selectedFriend.FriendName</span>
+            </div>
+            <div class="chat-messages">
+                @if (ChatMessages.Count > 0)
+                {
+                    @foreach (var message in ChatMessages)
+                    {
+                        <div class="message @(message.SenderId==currentUser.Id ? "sent" : "received")">
+                            @* <div class="message @message.SenderId == currentUser.Id ? 'sent' : 'received'"> *@
+                            @if (message.EmojiURL != "" && message.EmojiURL != null)
+                            {
+                                <img src="@message.EmojiURL" alt="emoji" />
+                            }
+                            else
+                            {
+                                <p>@message.Content</p>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+            <div class="message-input">
+                <input type="text" placeholder="Type your message..." @bind="messageContent" />
+                <button @onclick="SendMessage">Send</button>
+
+                <div class="emoji-buttons">
+                    @if (emojis.Count > 0)
+                    {
+                        @foreach (var emoji in emojis)
+                        {
+                            <button @onclick="() => SendEmoji(emoji)">
+                                <img src="@emoji.ImageUrl" alt="@emoji.Name" />
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<FriendsModel> FriendsList = new();
+    private List<FriendChat> ChatMessages = new();
+    private FriendsModel selectedFriend { get; set; }
+    private string messageContent { get; set; }
+    private int? selectedEmojiId { get; set; }
+    private DatingAppUser currentUser { get; set; }
+    private List<Emoji> emojis = new List<Emoji>
+    {
+        new Emoji { Id = 1, Name = "Heart", ImageUrl = "/Uploads/Emoji/heart.png" },
+        new Emoji { Id = 2, Name = "Happy", ImageUrl = "/Uploads/Emoji/happy.png" },
+        new Emoji { Id = 3, Name = "Sad", ImageUrl = "/Uploads/Emoji/sad.png" },
+        new Emoji { Id = 4, Name = "Love", ImageUrl = "/Uploads/Emoji/love.png" },
+        new Emoji { Id = 5, Name = "Cool", ImageUrl = "/Uploads/Emoji/cool.png" },
+        new Emoji { Id = 6, Name = "Flower", ImageUrl = "/Uploads/Emoji/flower.png" },
+        new Emoji { Id = 7, Name = "Laugh", ImageUrl = "/Uploads/Emoji/laugh.png" },
+        new Emoji { Id = 8, Name = "Loving", ImageUrl = "/Uploads/Emoji/loving.png" },
+        new Emoji { Id = 9, Name = "Naughty", ImageUrl = "/Uploads/Emoji/naughty.png" },
+        new Emoji { Id = 10, Name = "Kiss", ImageUrl = "/Uploads/Emoji/kiss.png" },
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        string email = "";
+        if (HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated)
+        {
+            email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
+        }
+        currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
+
+        FriendsList = await (from request in _context.ConnectionRequests
+                             join sender in _context.Users on request.SenderId equals sender.Id
+                             join receiver in _context.Users on request.ReceiverId equals receiver.Id
+                             where (request.ReceiverId == currentUser.Id || request.SenderId == currentUser.Id) && request.Status == RequestStatus.Accepted && sender.Role != "Admin" && receiver.Role != "Admin"
+                             select new FriendsModel
+                                 {
+                                     Id = request.Id,
+                                     SenderId = request.SenderId,
+                                     ReceiverId = request.ReceiverId,
+                                     FriendId = sender.Id == currentUser.Id ? receiver.Id : sender.Id,
+                                     RequestStatus = request.Status,
+                                     SenderName = sender.FirstName + " " + sender.LastName,
+                                     ReceiverName = receiver.FirstName + " " + receiver.LastName,
+                                     FriendName = sender.Id == currentUser.Id ? receiver.FirstName + " " + receiver.LastName : sender.FirstName + " " + sender.LastName,
+                                     SenderGender = sender.Gender,
+                                     ReceiverGender = receiver.Gender,
+                                     ProfileImage = (sender.Id == currentUser.Id) ? $"/Uploads/Images/{receiver.ProfileImageUrl}" : $"/Uploads/Images/{sender.ProfileImageUrl}",
+                                     Bio = (sender.Id == currentUser.Id) ? receiver.Bio : sender.Bio,
+                                 }).ToListAsync();
+    }
+
+    private async Task LoadChat(FriendsModel friend)
+    {
+        selectedFriend = friend;
+
+        // Load the chat history between the current user and selected friend
+        ChatMessages = await _context.Message
+                                     .Where(m =>
+     (m.SenderId == currentUser.Id && m.ReceiverId == selectedFriend.FriendId) ||
+        (m.SenderId == selectedFriend.FriendId && m.ReceiverId == currentUser.Id))
+        .OrderBy(m => m.Timestamp)
+                                         .Select(
+                                             s => new FriendChat
+                                                 {
+                                                     Id = s.Id,
+                                                     SenderId = s.SenderId,
+                                                     ReceiverId = s.ReceiverId,
+                                                     SenderName = s.Sender.Id == currentUser.Id ? "You" : s.Receiver.FirstName + " " + s.Receiver.LastName,
+                                                     Content = s.Content,
+                                                     EmojiURL = s.EmojiURL,
+                                                     Timestamp = s.Timestamp
+                                                 }
+                                         )
+                                         .ToListAsync();
+    }
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(messageContent) || selectedEmojiId.HasValue)
+        {
+            var receiver = await UserManager.Users.FirstOrDefaultAsync(x => x.Id == selectedFriend.FriendId);
+            var message = new Message
+                {
+                    Content = messageContent,
+                    SenderId = currentUser.Id,
+                    ReceiverId = selectedFriend.FriendId,
+                    Timestamp = DateTime.Now,
+                    Sender = currentUser,
+                    Receiver = receiver
+                };
+
+            _context.Message.Add(message);
+            await _context.SaveChangesAsync();
+
+            // Clear the message input
+            messageContent = string.Empty;
+            selectedEmojiId = null;
+
+            // Reload the chat to include the new message
+            await LoadChat(selectedFriend);
+
+            Logger.LogInformation("Message sent.");
+        }
+    }
+
+    private async Task SendEmoji(Emoji emoji)
+    {
+        if (!string.IsNullOrWhiteSpace(emoji.ImageUrl) || selectedEmojiId.HasValue)
+        {
+            var receiver = await UserManager.Users.FirstOrDefaultAsync(x => x.Id == selectedFriend.FriendId);
+            var message = new Message
+                {
+                    Content = messageContent,
+                    SenderId = currentUser.Id,
+                    ReceiverId = selectedFriend.FriendId,
+                    EmojiURL = emoji.ImageUrl,
+                    Timestamp = DateTime.Now,
+                    Sender = currentUser,
+                    Receiver = receiver
+                };
+
+            _context.Message.Add(message);
+            await _context.SaveChangesAsync();
+
+            // Clear the message input
+            messageContent = string.Empty;
+            selectedEmojiId = null;
+
+            // Reload the chat to include the new message
+            await LoadChat(selectedFriend);
+
+            Logger.LogInformation("Message sent.");
+        }
+    }
+
+    // Message and Emoji Models
+    public class FriendChat
+    {
+        public int? Id { get; set; }
+        public string? Content { get; set; }
+        public string? SenderName { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? FriendName { get; set; }
+        public string? SenderId { get; set; }
+        public string? ReceiverId { get; set; }
+        public string? EmojiURL { get; set; }
+        public DateTime? Timestamp { get; set; }
+        public DatingAppUser? Sender { get; set; }
+        public DatingAppUser? Receiver { get; set; }
+    }
+
+    public class Emoji
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class FriendsModel
+    {
+        public int? Id { get; set; }
+        public string? SenderName { get; set; }
+        public string? FriendName { get; set; }
+        public string? FriendImage { get; set; }
+        public string? FriendGender { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? SenderGender { get; set; }
+        public string? ReceiverGender { get; set; }
+        public string? Bio { get; set; }
+        public string? ProfileImage { get; set; }
+        public string? SenderId { get; set; }
+        public string? FriendId { get; set; }
+        public string? ReceiverId { get; set; }
+        public RequestStatus? RequestStatus { get; set; }
+    }
+}

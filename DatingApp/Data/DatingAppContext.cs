@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DatingApp.Data;
+using DatingAppFSDProject.Domain;
 
 namespace DatingApp.Data
 {
@@ -15,5 +16,7 @@ namespace DatingApp.Data
 		public DbSet<DatingAppFSDProject.Domain.Report> Report { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Setting> Setting { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.User> User { get; set; } = default!;
-	}
+		public DbSet<DatingAppFSDProject.Domain.ConnectionRequest> ConnectionRequests { get; set; } = default!;
+    }
 }
+
