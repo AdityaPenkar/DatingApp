@@ -1,0 +1,145 @@
+﻿@page "/receivedRequests"
+@inject NavigationManager Navigation
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<DatingAppUser> UserManager
+@inject ILogger<AllRequest> Logger
+@rendermode InteractiveServer
+@inject ILocalStorageService LocalStorageService
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.Security.Claims;
+@inject DatingAppContext _context
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IServiceScopeFactory ServiceScopeFactory
+
+<PageTitle>Received Requests</PageTitle>
+
+<div class="requests-container">
+    @if (ReceivedRequests.Count > 0)
+    {
+        @foreach (var request in ReceivedRequests)
+        {
+            <div class="request-card" @key="request.Id">
+                <div class="profile-card-r">
+                    <img src="@request.ProfileImage" alt="Profile Image" class="request-image">
+                    <h3>@request.SenderName</h3>
+                    <p>@request.Bio</p>
+
+                    <!-- Display Gender Icon -->
+                    <span class="gender-icon">
+                        @if (request.SenderGender == "Male")
+                        {
+                            <span role="img" aria-label="Male">👨</span> <!-- Male Emoji -->
+                        }
+                        else if (request.SenderGender == "Female")
+                        {
+                            <span role="img" aria-label="Female">👩</span> <!-- Female Emoji -->
+                        }
+                        else
+                        {
+                            <span role="img" aria-label="Other">🌈</span> <!-- Gender-neutral Emoji -->
+                        }
+                    </span>
+                </div>
+                <div class="action-buttons">
+                    <button class="accept-btn" @onclick="() => AcceptRequest(request.Id)">❤️ Accept</button>
+                    <button class="reject-btn" @onclick="() => RejectRequest(request.Id)">❌ Reject</button>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p>No connection requests to show.</p>
+    }
+</div>
+
+
+
+@code {
+    private List<ReceivedRequest> ReceivedRequests = new();
+    private DatingAppUser currentUser { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        string email = "";
+        if (HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated)
+        {
+            email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
+        }
+        currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
+        ReceivedRequests = await _context.ConnectionRequests
+            .Include(r => r.Sender)
+                .ThenInclude(s => s.Profile)  
+            .Include(r => r.Receiver)
+                .ThenInclude(r => r.Profile) 
+            .Where(r => r.ReceiverId == currentUser.Id
+                        && r.Status != RequestStatus.Accepted
+                        && r.Sender.Profile.Role != "Admin"
+                        && r.Receiver.Profile.Role != "Admin")
+            .Select(r => new ReceivedRequest
+                {
+                    Id = r.Id,
+                    SenderId = r.SenderId,
+                    RequestStatus = r.Status,
+                    SenderName = r.Sender.FirstName + " " + r.Sender.LastName,
+                    SenderGender = r.Sender.Gender,
+                    ProfileImage = $"/Uploads/Images/{r.Sender.Profile.ProfileImageUrl}",
+                    Bio = r.Sender.Profile.Bio,
+                })
+            .ToListAsync();
+    }
+
+    private async Task AcceptRequest(int? requestId)
+    {
+        var request = await _context.ConnectionRequests.FindAsync(requestId);
+        if (request != null)
+        {
+            request.Status = RequestStatus.Accepted;
+            await _context.SaveChangesAsync();
+            Logger.LogInformation("Request accepted.");
+            // Remove the accepted request from the list
+            var requestToRemove = ReceivedRequests.FirstOrDefault(r => r.Id == requestId);
+            if (requestToRemove != null)
+            {
+                ReceivedRequests.Remove(requestToRemove);
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task RejectRequest(int? requestId)
+    {
+        var request = await _context.ConnectionRequests.FindAsync(requestId);
+        if (request != null)
+        {
+            request.Status = RequestStatus.Rejected;
+            await _context.SaveChangesAsync();
+            Logger.LogInformation("Request rejected.");
+            // Remove the accepted request from the list
+            var requestToRemove = ReceivedRequests.FirstOrDefault(r => r.Id == requestId);
+            if (requestToRemove != null)
+            {
+                ReceivedRequests.Remove(requestToRemove);
+            }
+
+            // Update the UI
+            StateHasChanged();
+        }
+    }
+
+    public class ReceivedRequest
+    {
+        public int? Id { get; set; }
+        public string SenderName { get; set; }
+        public string SenderGender { get; set; }
+        public string Bio { get; set; }
+        public string ProfileImage { get; set; }
+        public string SenderId { get; set; }
+        public RequestStatus? RequestStatus { get; set; }
+    }
+}

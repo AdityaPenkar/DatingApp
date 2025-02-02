@@ -1,4 +1,14 @@
 ﻿@page "/Account/Lockout"
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Authentication.Cookies;
+@inject ILogger<Lockout> Logger
 
 <PageTitle>Locked out</PageTitle>
 
@@ -6,3 +16,15 @@
     <h1 class="text-danger">Locked out</h1>
     <p class="text-danger">This account has been locked out, please try again later.</p>
 </header>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Sign out the user
+        await HttpContextAccessor.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        Logger.LogInformation("Account Logout");
+
+        // Redirect to the login page after logout
+        NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
+    }
+}

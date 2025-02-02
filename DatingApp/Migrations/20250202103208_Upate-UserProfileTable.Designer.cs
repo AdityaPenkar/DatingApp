@@ -4,6 +4,7 @@ using DatingApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DatingApp.Migrations
 {
     [DbContext(typeof(DatingAppContext))]
-    partial class DatingAppContextModelSnapshot : ModelSnapshot
+    [Migration("20250202103208_Upate-UserProfileTable")]
+    partial class UpateUserProfileTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -105,6 +108,31 @@ namespace DatingApp.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("DatingAppFSDProject.Domain.Admin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Password")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ReportId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Admin");
+                });
+
             modelBuilder.Entity("DatingAppFSDProject.Domain.ConnectionRequest", b =>
                 {
                     b.Property<int?>("Id")
@@ -129,6 +157,31 @@ namespace DatingApp.Migrations
                     b.HasIndex("SenderId");
 
                     b.ToTable("ConnectionRequests");
+                });
+
+            modelBuilder.Entity("DatingAppFSDProject.Domain.Match", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MatchScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId1")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId2")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Match");
                 });
 
             modelBuilder.Entity("DatingAppFSDProject.Domain.Message", b =>
@@ -172,6 +225,28 @@ namespace DatingApp.Migrations
                     b.ToTable("Message");
                 });
 
+            modelBuilder.Entity("DatingAppFSDProject.Domain.MessageBox", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MatchId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("TimeRecieved")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MessageBox");
+                });
+
             modelBuilder.Entity("DatingAppFSDProject.Domain.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -200,6 +275,28 @@ namespace DatingApp.Migrations
                     b.ToTable("Notification");
                 });
 
+            modelBuilder.Entity("DatingAppFSDProject.Domain.Photo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId");
+
+                    b.ToTable("Photo");
+                });
+
             modelBuilder.Entity("DatingAppFSDProject.Domain.Profile", b =>
                 {
                     b.Property<int>("Id")
@@ -211,6 +308,9 @@ namespace DatingApp.Migrations
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("BlockedUser")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Interest")
                         .HasColumnType("nvarchar(max)");
 
@@ -220,8 +320,17 @@ namespace DatingApp.Migrations
                     b.Property<string>("Role")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SettingId")
+                        .HasColumnType("int");
+
                     b.Property<string>("UId")
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Visible")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -283,6 +392,43 @@ namespace DatingApp.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Setting");
+                });
+
+            modelBuilder.Entity("DatingAppFSDProject.Domain.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Biography")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("DateOfBirth")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Gender")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Interests")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Password")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("User");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -448,6 +594,17 @@ namespace DatingApp.Migrations
                     b.Navigation("Sender");
                 });
 
+            modelBuilder.Entity("DatingAppFSDProject.Domain.Photo", b =>
+                {
+                    b.HasOne("DatingAppFSDProject.Domain.Profile", "Profile")
+                        .WithMany("Photos")
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
             modelBuilder.Entity("DatingAppFSDProject.Domain.Profile", b =>
                 {
                     b.HasOne("DatingApp.Data.DatingAppUser", "User")
@@ -512,6 +669,11 @@ namespace DatingApp.Migrations
             modelBuilder.Entity("DatingApp.Data.DatingAppUser", b =>
                 {
                     b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("DatingAppFSDProject.Domain.Profile", b =>
+                {
+                    b.Navigation("Photos");
                 });
 #pragma warning restore 612, 618
         }

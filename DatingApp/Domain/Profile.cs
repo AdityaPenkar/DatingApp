@@ -1,26 +1,20 @@
-﻿using System.Collections.Generic;
+﻿using DatingApp.Data;
+using System.Collections.Generic;
 
 namespace DatingAppFSDProject.Domain
 {
 	public class Profile : BaseDomainModel
 	{
-		public ICollection<Photo> Photos { get; set; } = new List<Photo>();
 
-		public bool Visible { get; set; }
-		public string? BlockedUser { get; set; }
-		public int UserId { get; set; } // Foreign key for User
-		public int SettingId { get; set; } // Foreign key for Setting
-	}
+		public string? UId { get; set; } // Foreign key for User
+        public string? Role { get; set; }
+        public string? Bio { get; set; }
+        public string? ProfileImageUrl { get; set; }
+        public string? Interest { get; set; }
 
-	// Photo Entity (Nested within Profile class file)
-	public class Photo
-	{
-		public int Id { get; set; } // Primary key for Photo
+        // Navigation property
+        public DatingAppUser? User { get; set; }
+    }
 
-		public string Url { get; set; } = string.Empty; // Stores the photo URL or file path
-
-		public int ProfileId { get; set; } // Foreign key for Profile
-		public Profile? Profile { get; set; } // Navigation property to Profile
-	}
 }
 

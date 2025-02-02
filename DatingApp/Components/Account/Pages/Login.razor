@@ -4,22 +4,30 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Authentication.Cookies;
+@using DatingAppFSDProject.Domain;
 
 @inject SignInManager<DatingAppUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILocalStorageService LocalStorageService
+@inject DatingAppContext _context
 
 <PageTitle>Log in</PageTitle>
 
-<h1>Log in</h1>
 <div class="row">
     <div class="col-md-4">
+        <h1>Log in</h1>
         <section>
+
             <StatusMessage Message="@errorMessage" />
             <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
                 <DataAnnotationsValidator />
-                <h2>Use a local account to log in.</h2>
+                @* <h2>Use a local account to log in.</h2> *@
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />
                 <div class="form-floating mb-3">
@@ -32,16 +40,16 @@
                     <label for="password" class="form-label">Password</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
-                <div class="checkbox mb-3">
+               @*  <div class="checkbox mb-3">
                     <label class="form-label">
                         <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
                         Remember me
                     </label>
-                </div>
+                </div> *@
                 <div>
                     <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
                 </div>
-                <div>
+               @*  <div>
                     <p>
                         <a href="Account/ForgotPassword">Forgot your password?</a>
                     </p>
@@ -51,15 +59,13 @@
                     <p>
                         <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
                     </p>
-                </div>
+                </div> *@
             </EditForm>
         </section>
     </div>
     <div class="col-md-6 col-md-offset-2">
-        <section>
-            <h3>Use another service to log in.</h3>
-            <hr />
-            <ExternalLoginPicker />
+        <section class="login-image-section">
+            <img src="/Uploads/App/banner1.png" alt="Dating Couple" class="img-fluid" />
         </section>
     </div>
 </div>
@@ -90,10 +96,46 @@
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        Logger.LogInformation("User logged in.1");
+
         if (result.Succeeded)
         {
-            Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+            var user = SignInManager.UserManager.Users.FirstOrDefault(s => s.Email == Input.Email);
+            if (user != null && user.isDeleted == false)
+            {
+                var profile=_context.Profile.FirstOrDefault(p => p.UId == user.Id);
+                var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name, Input.Email)
+        };
+
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
+                    new AuthenticationProperties
+                        {
+                            IsPersistent = Input.RememberMe
+                        });
+
+                if (profile.Role == "Admin")
+                {
+                    NavigationManager.NavigateTo("/Admin/Users");
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/");
+                }
+                Logger.LogInformation("User logged in.");
+                // Update authentication state on successful login
+                // await LocalStorageService.SetItemAsync("userEmail", Input.Email);
+
+                // RedirectManager.RedirectTo(ReturnUrl);
+            }
+            else
+            {
+                errorMessage = "Error: Invalid login attempt.";
+            }
         }
         else if (result.RequiresTwoFactor)
         {

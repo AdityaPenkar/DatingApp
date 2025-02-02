@@ -1,0 +1,174 @@
+﻿@page "/profilesMatches"
+@inject NavigationManager Navigation
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+   @using Microsoft.AspNetCore.Identity
+   @using Microsoft.EntityFrameworkCore
+   @inject UserManager<DatingAppUser> UserManager
+   @inject ILogger<ProfilesMatches> Logger
+   @rendermode InteractiveServer
+   @inject ILocalStorageService LocalStorageService
+   @inject IHttpContextAccessor HttpContextAccessor
+   @using System.Security.Claims;
+   @inject DatingAppContext _context
+   @inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+   @inject IServiceScopeFactory ServiceScopeFactory
+
+
+<PageTitle>Profiles</PageTitle>
+<div class="profile-container">
+    @if (ProfilesList.Count > 0 && CurrentProfileIndex < ProfilesList.Count)
+    {
+        <div class="profile-card" @onpointerdown="StartSwipe" @onpointermove="OnSwipe" @onpointerup="EndSwipe">
+            <img src="@ProfilesList[CurrentProfileIndex].ImageUrl" alt="Profile Image">
+            <h2>@ProfilesList[CurrentProfileIndex].Name</h2>
+            <p>@ProfilesList[CurrentProfileIndex].Bio</p>
+            <p class="interest-p"><strong>Interest:</strong> @ProfilesList[CurrentProfileIndex].Interest</p> 
+            <p>@value</p>
+        </div>
+        <div class="buttons">
+            <button class="reject-btn" @onclick="RejectProfile">❌ Skip</button>
+            <button class="like-btn" @onclick="LikeProfile" disabled="@(isLoading || IsRequestSent(ProfilesList[CurrentProfileIndex].Email))">
+                @if (isLoading)
+                {
+                    <span>⏳ Sending...</span>
+                }
+                else if (IsRequestSent(ProfilesList[CurrentProfileIndex].Email))
+                {
+                    <span>✅ Sent</span>
+                }
+                else
+                {
+                    <span>❤️ Like</span>
+                }
+            </button>
+
+        </div>
+    }
+    else
+    {
+        <p>No more profiles to show.</p>
+    }
+</div>
+
+@code {
+    private List<Profile> ProfilesList = new();
+    private int CurrentProfileIndex = 0;
+    private double SwipeStartX;
+    private double SwipeEndX;
+    private string value = "";
+    private bool isLoading = false;
+    private DatingAppUser currentUser { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        string email = "";
+        if (HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated)
+        {
+            email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
+        }
+        currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
+        ProfilesList = await UserManager.Users
+        .Include(u => u.Profile)
+        .Where(u => u.Email != email && u.Profile.Role != "Admin" && u.isDeleted == false)
+        .Select(user => new Profile
+        {
+            Id = user.Id,
+            Name = user.FirstName + " " + user.LastName,
+            Bio = user.Profile.Bio,
+            ImageUrl = $"/Uploads/Images/{user.Profile.ProfileImageUrl}",
+            Email = user.Email,
+            Interest= user.Profile.Interest
+        })
+    .ToListAsync();
+
+    }
+    private void StartSwipe(PointerEventArgs e) => SwipeStartX = e.ClientX;
+    private void OnSwipe(PointerEventArgs e) => SwipeEndX = e.ClientX;
+
+    private void EndSwipe()
+    {
+        if (SwipeEndX - SwipeStartX > 50) LikeProfile();  // Swipe Right
+        else if (SwipeStartX - SwipeEndX > 50) RejectProfile();  // Swipe Left
+    }
+
+    private void RejectProfile()
+    {
+        if (CurrentProfileIndex < ProfilesList.Count) CurrentProfileIndex++;
+    }
+    private List<string> SentRequests = new();
+
+    private async Task LikeProfile()
+    {
+        Logger.LogInformation("User like in.");
+
+        if (CurrentProfileIndex >= ProfilesList.Count || isLoading || IsRequestSent(ProfilesList[CurrentProfileIndex].Email))
+            return;
+
+        isLoading = true;
+        try
+        {
+            var receiver = ProfilesList[CurrentProfileIndex];
+            if (receiver == null) return;
+
+            var senderId = currentUser.Id;
+            var receiverId = receiver.Id;
+
+            using (var scope = ServiceScopeFactory.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+
+                var existingRequest = await dbContext.ConnectionRequests
+                                                     .FirstOrDefaultAsync(r => r.SenderId == senderId && r.ReceiverId == receiverId);
+
+                if (existingRequest == null)
+                {
+                    var newRequest = new ConnectionRequest
+                        {
+                            SenderId = senderId,
+                            ReceiverId = receiverId,
+                            Status = RequestStatus.Default
+                        };
+
+                    dbContext.ConnectionRequests.Add(newRequest);
+                    await dbContext.SaveChangesAsync();
+                    SentRequests.Add(receiver.Email);
+                    value = newRequest.Id.ToString();
+                    Console.WriteLine("Saved request to DB.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            CurrentProfileIndex++;
+            Console.WriteLine("Saved request to DB1.");
+        }
+    }
+    private bool IsRequestSent(string receiverEmail)
+    {
+        var receiver = UserManager.Users.FirstOrDefault(u => u.Email == receiverEmail);
+
+        if (receiver == null) return false;
+        using var context = DbFactory.CreateDbContext();
+
+        var result = context.ConnectionRequests.Any(r => (r.SenderId == currentUser.Id && r.ReceiverId == receiver.Id) || (r.SenderId == receiver.Id && r.ReceiverId == currentUser.Id));
+        return result;
+    }
+
+    public class Profile
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Bio { get; set; }
+        public string ImageUrl { get; set; }
+        public string Email { get; set; }
+        public string Interest { get; set; }
+    }
+}

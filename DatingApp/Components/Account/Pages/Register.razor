@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using DatingApp.Data
+@using DatingAppFSDProject.Domain;
 
 @inject UserManager<DatingAppUser> UserManager
 @inject IUserStore<DatingAppUser> UserStore
@@ -15,6 +16,7 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject DatingAppContext _context
 
 <PageTitle>Register</PageTitle>
 
@@ -27,7 +29,7 @@
             <DataAnnotationsValidator />
             <h2>Create a new account.</h2>
             <hr />
-            <ValidationSummary class="text-danger" role="alert" />
+            @* <ValidationSummary class="text-danger" role="alert" /> *@
 
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
@@ -79,10 +81,8 @@
         </EditForm>
     </div>
     <div class="col-md-6 col-md-offset-2">
-        <section>
-            <h3>Use another service to register.</h3>
-            <hr />
-            <ExternalLoginPicker />
+        <section class="login-image-section">
+            <img src="/Uploads/App/banner2.png" alt="Dating Couple" class="img-fluid" />
         </section>
     </div>
 </div>
@@ -112,7 +112,14 @@
         user.Email = Input.Email;
         user.Password = Input.Password;
         user.DateOfBirth = Input.DateOfBirth;
+        user.isDeleted = false;
 
+        var isFirstAccount = UserManager.Users.Any();
+        Profile profile = new Profile();
+        profile.Role = isFirstAccount ? "User" : "Admin";
+        profile.ProfileImageUrl = user.Gender == "Male" ? "boy.png" : "girl.png";
+        profile.Interest = user.Gender == "Male" ? "I am looking for a relationship" : "looking for a friend"; ;
+        profile.Bio = "Passionate about love and connection.";
         var today = DateTime.Today;
         var age = today.Year - Input.DateOfBirth.Year;
         if (Input.DateOfBirth.Date > today.AddYears(-age)) age--; // Adjust for birthdate not yet reached this year
@@ -128,8 +135,15 @@
         }
 
         var result = await UserManager.CreateAsync(user, Input.Password);
+        if (result.Succeeded)
+        {
+            // Create the associated Profile
+            profile.UId = user.Id;
+            _context.Profile.Add(profile);
+            await _context.SaveChangesAsync();
+        }
 
-        if (!result.Succeeded)
+        else if (!result.Succeeded)
         {
             identityErrors = result.Errors;
             return;
