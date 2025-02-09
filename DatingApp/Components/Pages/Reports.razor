@@ -1,0 +1,84 @@
+﻿@page "/Admin/Reports"
+@using DatingApp.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject NavigationManager Navigation
+@inject DatingAppContext _context
+@inject UserManager<DatingAppUser> UserManager
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+
+<PageTitle>Reports Management</PageTitle>
+
+<h2>User Reports</h2>
+
+@if (ReportsList.Count > 0)
+{
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Reporter Name</th>
+                <th>Reporter Email</th>
+                <th>Reported User Name</th>
+                <th>Reported User Email</th>
+                <th>Reason</th>
+                <th>Date Reported</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var report in ReportsList)
+            {
+                <tr>
+                    <td>@report.ReporterName</td>
+                    <td>@report.ReporterEmail</td>
+                    <td>@report.ReportedUserName</td>
+                    <td>@report.ReportedUserEmail</td>
+                    <td>@report.Reason</td>
+                    <td>@report.DateTimeReported.ToString("dd MMM yyyy HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No reports found.</p>
+}
+
+@code {
+    private List<ReportViewModel> ReportsList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        ReportsList = await context.Report
+            .Join(context.Users, r => r.SenderId, sender => sender.Id, (r, sender) => new { r, sender })
+            .Join(context.Users, rs => rs.r.RecieverId, receiver => receiver.Id, (rs, receiver) => new ReportViewModel
+                {
+                    ReporterName = rs.sender.FirstName + " " + rs.sender.LastName,
+                    ReporterEmail = rs.sender.Email,
+                    ReportedUserName = receiver.FirstName + " " + receiver.LastName,
+                    ReportedUserEmail = receiver.Email,
+                    Reason = rs.r.Reason,
+                    DateTimeReported = rs.r.DateTimeReported
+                })
+            .OrderByDescending(r => r.DateTimeReported)
+            .ToListAsync();
+    }
+
+    private class ReportViewModel
+    {
+        public string ReporterName { get; set; }
+        public string ReporterEmail { get; set; }
+        public string ReportedUserName { get; set; }
+        public string ReportedUserEmail { get; set; }
+        public string Reason { get; set; }
+        public DateTime DateTimeReported { get; set; }
+    }
+}
+
+
+
+
+
+

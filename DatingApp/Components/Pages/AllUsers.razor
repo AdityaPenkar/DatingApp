@@ -86,11 +86,14 @@
     {
         if (Users.Count > 0)
         {
-            foreach (var user in Users)
+            foreach (var user in Users.ToList()) // ToList() prevents modification during iteration
             {
                 var editUser = await UserManager.Users.FirstOrDefaultAsync(s => s.Id == user.UserId);
-                editUser.isDeleted = true;
-                var result = UserManager.UpdateAsync(editUser);
+                if (editUser != null)
+                {
+                    editUser.isDeleted = true;
+                    await UserManager.UpdateAsync(editUser); // Await update
+                }
             }
             Users.Clear();
             StateHasChanged();

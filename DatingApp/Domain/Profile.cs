@@ -11,6 +11,7 @@ namespace DatingAppFSDProject.Domain
         public string? Bio { get; set; }
         public string? ProfileImageUrl { get; set; }
         public string? Interest { get; set; }
+        public string? SkippedProfiles { get; set; }
 
         // Navigation property
         public DatingAppUser? User { get; set; }

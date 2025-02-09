@@ -669,3 +669,32 @@ textarea {
         max-height: 100%;
         object-fit: cover;
     }
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+    .report-table th, .report-table td {
+        border: 1px solid #ddd;
+        padding:20px; /* Increased padding for more spacing */
+        text-align: left;
+        font-size: 16px; /* Increase font size for better readability */
+    }
+
+    .report-table th {
+        background-color: #f4f4f4;
+        font-weight: bold;
+    }
+
+    .report-table tr:nth-child(even) {
+        background-color: #f9f9f9; /* Alternating row colors for better readability */
+    }
+
+    .report-table tr:hover {
+        background-color: #f1f1f1; /* Highlight row on hover */
+    }
+
+
+

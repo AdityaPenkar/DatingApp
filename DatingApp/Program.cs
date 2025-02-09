@@ -62,6 +62,8 @@ builder.Services.AddAuthorizationCore();
 
 builder.Services.AddScoped<ILocalStorageService, LocalStorageService>();
 
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
 
 builder.Services.AddSingleton<IEmailSender<DatingAppUser>, IdentityNoOpEmailSender>();
 

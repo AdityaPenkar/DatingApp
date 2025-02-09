@@ -8,7 +8,7 @@ namespace DatingApp.Data
     public class DatingAppContext(DbContextOptions<DatingAppContext> options) : IdentityDbContext<DatingAppUser>(options)
     {
 		public DbSet<DatingAppFSDProject.Domain.Message> Message { get; set; } = default!;
-		public DbSet<DatingAppFSDProject.Domain.Notification> Notification { get; set; } = default!;
+		public DbSet<DatingAppFSDProject.Domain.Censorship> Censorship { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Profile> Profile { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Report> Report { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Setting> Setting { get; set; } = default!;

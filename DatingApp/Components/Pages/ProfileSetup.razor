@@ -33,8 +33,12 @@
     </div>
     <!-- Interest Section -->
     <div class="interest-section">
-        <label for="interestInput">Interest:</label>
-        <input type="text" id="interestInput" @bind="Interest" placeholder="Enter your interest here" />
+        <label for="interestInput">Interested in:</label>
+        <select id="interestInput" @bind="Interest">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="All">All</option>
+        </select>
     </div>
 
     <!-- Gender Selection -->
@@ -69,7 +73,7 @@
         if (currentUser != null)
         {
             Username = currentUser.FirstName + " " + currentUser.LastName;
-            var profile=_context.Profile.FirstOrDefault(p => p.UId == currentUser.Id);
+            var profile = _context.Profile.FirstOrDefault(p => p.UId == currentUser.Id);
             Bio = profile.Bio;
             ProfileImageUrl = $"/Uploads/Images/{profile.ProfileImageUrl}?v={DateTime.Now.Ticks}";
             Interest = profile.Interest;
@@ -149,6 +153,6 @@
         {
             StatusMessage = "An error occurred while saving changes.";
         }
-        
+
     }
 }

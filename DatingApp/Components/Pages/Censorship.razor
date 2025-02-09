@@ -1,0 +1,147 @@
+﻿@page "/Admin/Censorship"
+@inject NavigationManager Navigation
+@using DatingApp.Data
+@using DatingAppFSDProject.Services
+@using DatingAppFSDProject.Domain
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<DatingAppUser> UserManager
+@inject ILogger<Censorship> Logger
+@rendermode InteractiveServer
+@inject IHttpContextAccessor HttpContextAccessor
+@inject DatingAppContext _context
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IServiceScopeFactory ServiceScopeFactory
+
+<PageTitle>Censorship Settings</PageTitle>
+
+<div class="censorship-container">
+    <h2>Censorship Settings</h2>
+
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <div class="status-message">@StatusMessage</div>
+    }
+
+    <div class="censorship-section">
+        <label for="censoredWordsInput">Enter words to censor (comma separated):</label>
+        <input type="text" id="censoredWordsInput" @bind="NewCensoredWords" />
+    </div>
+
+    <button class="save-btn" @onclick="SaveCensorship">Add Words</button>
+
+    <div class="existing-words">
+        <h3>Currently Censored Words:</h3>
+        @if (CensoredWordList.Any())
+        {
+            <ul>
+                @foreach (var word in CensoredWordList)
+                {
+                    <li>
+                        @word
+                        <button class="delete-btn" @onclick="() => RemoveCensorship(word)">Delete</button>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No words are currently censored.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private string? NewCensoredWords { get; set; }
+    private string StatusMessage { get; set; } = string.Empty;
+    private List<string> CensoredWordList { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCensoredWords();
+    }
+
+    private async Task LoadCensoredWords()
+    {
+        var censorshipEntry = await _context.Censorship.FirstOrDefaultAsync();
+        if (censorshipEntry != null && !string.IsNullOrEmpty(censorshipEntry.CensoredWords))
+        {
+            CensoredWordList = censorshipEntry.CensoredWords.Split(',').Select(w => w.Trim()).ToList();
+        }
+    }
+
+    private async Task SaveCensorship()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(NewCensoredWords))
+            {
+                var existingCensorship = await _context.Censorship.FirstOrDefaultAsync();
+                if (existingCensorship == null)
+                {
+                    existingCensorship = new DatingAppFSDProject.Domain.Censorship { CensoredWords = NewCensoredWords };
+                    _context.Censorship.Add(existingCensorship);
+                }
+                else
+                {
+                    var existingWords = existingCensorship.CensoredWords?.Split(',').Select(w => w.Trim()).ToList() ?? new List<string>();
+                    var newWords = NewCensoredWords.Split(',').Select(w => w.Trim()).ToList();
+                    existingWords.AddRange(newWords);
+                    existingWords = existingWords.Distinct().ToList(); // Ensure uniqueness
+                    existingCensorship.CensoredWords = string.Join(", ", existingWords);
+                    _context.Censorship.Update(existingCensorship);
+                }
+                await _context.SaveChangesAsync();
+                StatusMessage = "Censored words added successfully!";
+                await LoadCensoredWords(); // Reload the list
+                await Task.Delay(3000);
+                StatusMessage = string.Empty;
+                Logger.LogInformation("Censorship updated.");
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "An error occurred while saving changes.";
+            Logger.LogError(ex, "Error saving censorship settings");
+        }
+    }
+
+    private async Task RemoveCensorship(string word)
+    {
+        try
+        {
+            var existingCensorship = await _context.Censorship.FirstOrDefaultAsync();
+            if (existingCensorship != null && !string.IsNullOrEmpty(existingCensorship.CensoredWords))
+            {
+                var wordsList = existingCensorship.CensoredWords.Split(',')
+                                   .Select(w => w.Trim())
+                                   .Where(w => !string.IsNullOrEmpty(w)) // Ensure no empty entries
+                                   .ToList();
+
+                wordsList.Remove(word); // Remove selected word
+
+                // Update database entry
+                existingCensorship.CensoredWords = wordsList.Any() ? string.Join(", ", wordsList) : null; // Set to null if empty
+
+                _context.Censorship.Update(existingCensorship);
+                await _context.SaveChangesAsync();
+
+                StatusMessage = "Censored word removed successfully!";
+                await LoadCensoredWords(); // Reload the list
+                await Task.Delay(3000);
+                StatusMessage = string.Empty;
+                Logger.LogInformation($"Censorship updated. Removed: {word}");
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "An error occurred while removing the word.";
+            Logger.LogError(ex, $"Error removing censorship word: {word}");
+        }
+    }
+
+}
+
+
+
+

@@ -15,12 +15,9 @@
 @inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
 @inject IServiceScopeFactory ServiceScopeFactory
 
-
 <PageTitle>Messages</PageTitle>
 
-
 <div class="messages-container">
-    <!-- Left Side (Profiles) -->
     @if (FriendsList.Count > 0)
     {
         <div class="profile-list">
@@ -33,7 +30,6 @@
             }
         </div>
     }
-    <!-- Right Side (Chat Window) -->
     <div class="chat-window">
         @if (selectedFriend != null)
         {
@@ -47,8 +43,7 @@
                     @foreach (var message in ChatMessages)
                     {
                         <div class="message @(message.SenderId==currentUser.Id ? "sent" : "received")">
-                            @* <div class="message @message.SenderId == currentUser.Id ? 'sent' : 'received'"> *@
-                            @if (message.EmojiURL != "" && message.EmojiURL != null)
+                            @if (!string.IsNullOrEmpty(message.EmojiURL))
                             {
                                 <img src="@message.EmojiURL" alt="emoji" />
                             }
@@ -60,19 +55,22 @@
                     }
                 }
             </div>
+
+            @if (!string.IsNullOrEmpty(warningMessage))
+            {
+                <div class="warning">@warningMessage</div>
+            }
+
             <div class="message-input">
                 <input type="text" placeholder="Type your message..." @bind="messageContent" />
                 <button @onclick="SendMessage">Send</button>
 
                 <div class="emoji-buttons">
-                    @if (emojis.Count > 0)
+                    @foreach (var emoji in emojis)
                     {
-                        @foreach (var emoji in emojis)
-                        {
-                            <button @onclick="() => SendEmoji(emoji)">
-                                <img src="@emoji.ImageUrl" alt="@emoji.Name" />
-                            </button>
-                        }
+                        <button @onclick="() => SendEmoji(emoji)">
+                            <img src="@emoji.ImageUrl" alt="@emoji.Name" />
+                        </button>
                     }
                 </div>
             </div>
@@ -83,11 +81,15 @@
 @code {
     private List<FriendsModel> FriendsList = new();
     private List<FriendChat> ChatMessages = new();
+    private List<string> censoredWords = new();
     private FriendsModel selectedFriend { get; set; }
     private string messageContent { get; set; }
+    private string warningMessage { get; set; } = string.Empty;
     private int? selectedEmojiId { get; set; }
     private DatingAppUser currentUser { get; set; }
     private List<Emoji> emojis = new List<Emoji>
+
+
     {
         new Emoji { Id = 1, Name = "Heart", ImageUrl = "/Uploads/Emoji/heart.png" },
         new Emoji { Id = 2, Name = "Happy", ImageUrl = "/Uploads/Emoji/happy.png" },
@@ -109,6 +111,11 @@
             email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
         }
         currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
+        var censoredWordsRaw = await _context.Censorship.Select(c => c.CensoredWords).ToListAsync();
+        censoredWords = censoredWordsRaw
+        .SelectMany(c => c?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+        .Distinct()
+        .ToList();
         FriendsList = await (from request in _context.ConnectionRequests
                              join sender in _context.Users on request.SenderId equals sender.Id
                              join senderProfile in _context.Profile on sender.Id equals senderProfile.UId
@@ -182,6 +189,13 @@
 
     }
 
+    private bool ContainsCensoredWords(string message)
+    {
+        var wordsInMessage = message.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return wordsInMessage.Any(word => censoredWords.Any(censoredWord => string.Equals(word, censoredWord, StringComparison.OrdinalIgnoreCase)));
+    }
+
+
     private async Task LoadChat(FriendsModel friend)
     {
         selectedFriend = friend;
@@ -209,9 +223,16 @@
 
     private async Task SendMessage()
     {
-        if (!string.IsNullOrWhiteSpace(messageContent) || selectedEmojiId.HasValue)
+        warningMessage = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(messageContent))
         {
-            var receiver = await UserManager.Users.FirstOrDefaultAsync(x => x.Id == selectedFriend.FriendId);
+            if (ContainsCensoredWords(messageContent))
+            {
+                warningMessage = "Your message contains censored words and cannot be sent.";
+                return;
+            }
+
             var message = new Message
                 {
                     Content = messageContent,
@@ -219,20 +240,13 @@
                     ReceiverId = selectedFriend.FriendId,
                     Timestamp = DateTime.Now,
                     Sender = currentUser,
-                    Receiver = receiver
+                    Receiver = await UserManager.Users.FirstOrDefaultAsync(x => x.Id == selectedFriend.FriendId)
                 };
 
             _context.Message.Add(message);
             await _context.SaveChangesAsync();
-
-            // Clear the message input
             messageContent = string.Empty;
-            selectedEmojiId = null;
-
-            // Reload the chat to include the new message
             await LoadChat(selectedFriend);
-
-            Logger.LogInformation("Message sent.");
         }
     }
 

@@ -3,18 +3,17 @@
 @using DatingApp.Data
 @using DatingAppFSDProject.Services
 @using DatingAppFSDProject.Domain
-   @using Microsoft.AspNetCore.Identity
-   @using Microsoft.EntityFrameworkCore
-   @inject UserManager<DatingAppUser> UserManager
-   @inject ILogger<ProfilesMatches> Logger
-   @rendermode InteractiveServer
-   @inject ILocalStorageService LocalStorageService
-   @inject IHttpContextAccessor HttpContextAccessor
-   @using System.Security.Claims;
-   @inject DatingAppContext _context
-   @inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
-   @inject IServiceScopeFactory ServiceScopeFactory
-
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<DatingAppUser> UserManager
+@inject ILogger<ProfilesMatches> Logger
+@rendermode InteractiveServer
+@inject ILocalStorageService LocalStorageService
+@inject IHttpContextAccessor HttpContextAccessor
+@using System.Security.Claims;
+@inject DatingAppContext _context
+@inject IDbContextFactory<DatingApp.Data.DatingAppContext> DbFactory
+@inject IServiceScopeFactory ServiceScopeFactory
 
 <PageTitle>Profiles</PageTitle>
 <div class="profile-container">
@@ -24,10 +23,11 @@
             <img src="@ProfilesList[CurrentProfileIndex].ImageUrl" alt="Profile Image">
             <h2>@ProfilesList[CurrentProfileIndex].Name</h2>
             <p>@ProfilesList[CurrentProfileIndex].Bio</p>
-            <p class="interest-p"><strong>Interest:</strong> @ProfilesList[CurrentProfileIndex].Interest</p> 
+            <p class="interest-p"><strong>Interest:</strong> @ProfilesList[CurrentProfileIndex].Interest</p>
             <p>@value</p>
         </div>
         <div class="buttons">
+            <button class="report-btn" @onclick="() => ShowReportBox()">📝 Report</button>
             <button class="reject-btn" @onclick="RejectProfile">❌ Skip</button>
             <button class="like-btn" @onclick="LikeProfile" disabled="@(isLoading || IsRequestSent(ProfilesList[CurrentProfileIndex].Email))">
                 @if (isLoading)
@@ -43,7 +43,6 @@
                     <span>❤️ Like</span>
                 }
             </button>
-
         </div>
     }
     else
@@ -52,6 +51,22 @@
     }
 </div>
 
+@if (isReporting)
+{
+    <div class="report-box">
+        <label for="report-reason">Select a reason for reporting this user:</label>
+        <select id="report-reason" @bind="selectedReason">
+            <option value="">Please select a reason</option>
+            @foreach (var reason in predefinedReasons)
+            {
+                <option value="@reason">@reason</option>
+            }
+        </select>
+        <button @onclick="SubmitReport">Submit Report</button>
+        <button @onclick="CancelReport">Cancel</button>
+    </div>
+}
+
 @code {
     private List<Profile> ProfilesList = new();
     private int CurrentProfileIndex = 0;
@@ -59,8 +74,18 @@
     private double SwipeEndX;
     private string value = "";
     private bool isLoading = false;
+    private bool isReporting = false;
+    private string selectedReason = ""; // Store the selected reason
     private DatingAppUser currentUser { get; set; }
 
+    private List<string> predefinedReasons = new List<string>
+    {
+        "Inappropriate Behavior",
+        "Spam or Scams",
+        "Fake Profile",
+        "Harassment",
+        "Other"
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -69,22 +94,55 @@
         {
             email = HttpContextAccessor.HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "Unknown";
         }
-        currentUser = await UserManager.Users.FirstOrDefaultAsync(x => x.Email == email);
-        ProfilesList = await UserManager.Users
-        .Include(u => u.Profile)
-        .Where(u => u.Email != email && u.Profile.Role != "Admin" && u.isDeleted == false)
-        .Select(user => new Profile
-        {
-            Id = user.Id,
-            Name = user.FirstName + " " + user.LastName,
-            Bio = user.Profile.Bio,
-            ImageUrl = $"/Uploads/Images/{user.Profile.ProfileImageUrl}",
-            Email = user.Email,
-            Interest= user.Profile.Interest
-        })
-    .ToListAsync();
 
+        currentUser = await UserManager.Users
+            .Include(u => u.Profile)
+            .FirstOrDefaultAsync(x => x.Email == email);
+
+        if (currentUser == null || currentUser.Profile == null)
+        {
+            return;
+        }
+
+        string userGender = currentUser.Gender; // Extract Gender from DatingAppUser
+        string userInterest = currentUser.Profile.Interest; // Interest comes from Profile
+
+        using (var scope = ServiceScopeFactory.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+
+            var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
+            var skippedUserIds = userProfile?.SkippedProfiles?.Split(',').ToList() ?? new List<string>();
+
+            ProfilesList = await UserManager.Users
+                .Include(u => u.Profile)
+                .Where(u => u.Email != email &&
+                            u.Profile.Role != "Admin" &&
+                            u.isDeleted == false &&
+                            !skippedUserIds.Contains(u.Id) &&
+                            (
+                                (userInterest == "Male" && u.Gender == "Male" &&
+                                  (u.Profile.Interest == userGender)) ||
+                                (userInterest == "Female" && u.Gender == "Female" &&
+                                  (u.Profile.Interest == userGender )) ||
+                                ((userInterest == "All" || string.IsNullOrEmpty(userInterest)) &&
+                                  (u.Profile.Interest == userGender ))
+                            ))
+                .Select(user => new Profile 
+                    {
+                        Id = user.Id,
+                        Name = user.FirstName + " " + user.LastName,
+                        Bio = user.Profile.Bio,
+                        ImageUrl = $"/Uploads/Images/{user.Profile.ProfileImageUrl}",
+                        Email = user.Email,
+                        Interest = user.Profile.Interest
+                    })
+                .ToListAsync();
+        }
     }
+
+
+
     private void StartSwipe(PointerEventArgs e) => SwipeStartX = e.ClientX;
     private void OnSwipe(PointerEventArgs e) => SwipeEndX = e.ClientX;
 
@@ -94,11 +152,105 @@
         else if (SwipeStartX - SwipeEndX > 50) RejectProfile();  // Swipe Left
     }
 
-    private void RejectProfile()
+    private async Task RejectProfile()
     {
-        if (CurrentProfileIndex < ProfilesList.Count) CurrentProfileIndex++;
+        if (CurrentProfileIndex < ProfilesList.Count)
+        {
+            var skippedUser = ProfilesList[CurrentProfileIndex];
+
+            if (skippedUser != null)
+            {
+                try
+                {
+                    using (var scope = ServiceScopeFactory.CreateScope())
+                    {
+                        var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+
+                        // Fetch the current user's profile
+                        var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
+
+                        if (userProfile != null)
+                        {
+                            // Append the skipped user ID if not already present
+                            var skippedList = userProfile.SkippedProfiles?.Split(',').ToList() ?? new List<string>();
+
+                            if (!skippedList.Contains(skippedUser.Id))
+                            {
+                                skippedList.Add(skippedUser.Id);
+                                userProfile.SkippedProfiles = string.Join(",", skippedList);
+
+                                // Save the updated profile
+                                await dbContext.SaveChangesAsync();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Error saving skipped profile: {ex.Message}");
+                }
+            }
+
+            // Move to next profile
+            CurrentProfileIndex++;
+        }
     }
+
+
     private List<string> SentRequests = new();
+
+    private void ShowReportBox()
+    {
+        isReporting = true;
+        Console.WriteLine("Report box is shown!");
+    }
+
+    private void CancelReport()
+    {
+        isReporting = false;
+        selectedReason = "";
+    }
+
+    private async Task SubmitReport()
+    {
+        if (string.IsNullOrWhiteSpace(selectedReason))
+        {
+            Logger.LogInformation("Please select a reason for reporting the user.");
+            return;
+        }
+
+        try
+        {
+            var reportedUser = ProfilesList[CurrentProfileIndex];
+            var senderId = currentUser.Id;
+            var receiverId = reportedUser.Id;
+
+            var newReport = new Report
+                {
+                    Reason = selectedReason,
+                    DateTimeReported = DateTime.Now,
+                    SenderId = senderId,
+                    RecieverId = receiverId,
+                    Status = "Pending"  // Status can be updated as needed
+                };
+
+            using (var scope = ServiceScopeFactory.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
+                dbContext.Report.Add(newReport);
+                await dbContext.SaveChangesAsync();
+            }
+
+            // Reset report selection
+            isReporting = false;
+            selectedReason = "";
+            Logger.LogInformation("Report submitted successfully.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error submitting report: {ex.Message}");
+        }
+    }
 
     private async Task LikeProfile()
     {
@@ -151,6 +303,7 @@
             Console.WriteLine("Saved request to DB1.");
         }
     }
+
     private bool IsRequestSent(string receiverEmail)
     {
         var receiver = UserManager.Users.FirstOrDefault(u => u.Email == receiverEmail);
@@ -170,5 +323,8 @@
         public string ImageUrl { get; set; }
         public string Email { get; set; }
         public string Interest { get; set; }
+
+        
     }
 }
+

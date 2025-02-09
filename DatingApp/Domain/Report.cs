@@ -3,9 +3,9 @@
     public class Report: BaseDomainModel
     {
         public string? Reason { get; set; }
-        public DateTime DateReported { get; set; }
+        public DateTime DateTimeReported { get; set; }
         public string? Status { get; set; }
-        public int UserId1 { get; set; }
-        public int UserId2 { get; set; }
+        public string? SenderId { get; set; }
+        public string? RecieverId { get; set; }
     }
 }
