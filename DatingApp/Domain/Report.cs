@@ -1,4 +1,4 @@
-﻿namespace DatingAppFSDProject.Domain
+﻿ namespace DatingAppFSDProject.Domain
 {
     public class Report: BaseDomainModel
     {

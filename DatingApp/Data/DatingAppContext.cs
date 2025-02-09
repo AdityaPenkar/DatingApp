@@ -11,7 +11,6 @@ namespace DatingApp.Data
 		public DbSet<DatingAppFSDProject.Domain.Censorship> Censorship { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Profile> Profile { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.Report> Report { get; set; } = default!;
-		public DbSet<DatingAppFSDProject.Domain.Setting> Setting { get; set; } = default!;
 		public DbSet<DatingAppFSDProject.Domain.ConnectionRequest> ConnectionRequests { get; set; } = default!;
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

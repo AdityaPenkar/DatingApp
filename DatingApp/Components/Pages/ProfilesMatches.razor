@@ -21,7 +21,7 @@
     {
         <div class="profile-card" @onpointerdown="StartSwipe" @onpointermove="OnSwipe" @onpointerup="EndSwipe">
             <img src="@ProfilesList[CurrentProfileIndex].ImageUrl" alt="Profile Image">
-            <h2>@ProfilesList[CurrentProfileIndex].Name</h2>
+            <h2>@ProfilesList[CurrentProfileIndex].Name, @ProfilesList[CurrentProfileIndex].Age</h2>
             <p>@ProfilesList[CurrentProfileIndex].Bio</p>
             <p class="interest-p"><strong>Interest:</strong> @ProfilesList[CurrentProfileIndex].Interest</p>
             <p>@value</p>
@@ -135,13 +135,29 @@
                         Bio = user.Profile.Bio,
                         ImageUrl = $"/Uploads/Images/{user.Profile.ProfileImageUrl}",
                         Email = user.Email,
-                        Interest = user.Profile.Interest
+                        Interest = user.Profile.Interest,
+                        Age = user.DateOfBirth.HasValue
+                    ? (DateTime.Now.Year - user.DateOfBirth.Value.Year)
+                      - (DateTime.Now.DayOfYear < user.DateOfBirth.Value.DayOfYear ? 1 : 0)
+                    : 0
                     })
                 .ToListAsync();
         }
     }
 
+    private int CalculateAge(DateTime? birthDate)
+    {
+        if (!birthDate.HasValue)
+            return 0; // Default if DOB is not provided
 
+        var today = DateTime.Today;
+        var age = today.Year - birthDate.Value.Year;
+
+        if (birthDate.Value.Date > today.AddYears(-age))
+            age--; // Adjust if birthday hasn't occurred yet this year
+
+        return age;
+    }
 
     private void StartSwipe(PointerEventArgs e) => SwipeStartX = e.ClientX;
     private void OnSwipe(PointerEventArgs e) => SwipeEndX = e.ClientX;
@@ -323,7 +339,7 @@
         public string ImageUrl { get; set; }
         public string Email { get; set; }
         public string Interest { get; set; }
-
+        public int Age { get; set; }
         
     }
 }

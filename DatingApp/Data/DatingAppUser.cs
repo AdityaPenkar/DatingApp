@@ -13,20 +13,7 @@ namespace DatingApp.Data
         public string? Password { get; set; }
         public DateTime? DateOfBirth { get; set; }
         public bool? isDeleted { get; set; }
-        public int Age
-        {
-            get
-            {
-                if (DateOfBirth.HasValue)
-                {
-                    var today = DateTime.Today;
-                    var age = today.Year - DateOfBirth.Value.Year;
-                    if (DateOfBirth.Value.Date > today.AddYears(-age)) age--;
-                    return age;
-                }
-                return 0; // Default value if DateOfBirth is null
-            }
-        }
+
         public Profile? Profile { get; set; }
     }
 }
