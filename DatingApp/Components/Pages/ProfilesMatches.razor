@@ -112,14 +112,14 @@
             var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
 
             var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
-            var skippedUserIds = userProfile?.SkippedProfiles?.Split(',').ToList() ?? new List<string>();
+            var seenUserIds = userProfile?.SeenProfiles?.Split(',').ToList() ?? new List<string>();
 
             ProfilesList = await UserManager.Users
                 .Include(u => u.Profile)
                 .Where(u => u.Email != email &&
                             u.Profile.Role != "Admin" &&
                             u.isDeleted == false &&
-                            !skippedUserIds.Contains(u.Id) &&
+                            !seenUserIds.Contains(u.Id) &&
                             (
                                 (userInterest == "Male" && u.Gender == "Male" &&
                                   (u.Profile.Interest == userGender)) ||
@@ -172,9 +172,9 @@
     {
         if (CurrentProfileIndex < ProfilesList.Count)
         {
-            var skippedUser = ProfilesList[CurrentProfileIndex];
+            var seenUser = ProfilesList[CurrentProfileIndex];
 
-            if (skippedUser != null)
+            if (seenUser != null)
             {
                 try
                 {
@@ -182,20 +182,17 @@
                     {
                         var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
 
-                        // Fetch the current user's profile
                         var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
 
                         if (userProfile != null)
                         {
-                            // Append the skipped user ID if not already present
-                            var skippedList = userProfile.SkippedProfiles?.Split(',').ToList() ?? new List<string>();
+                            var seenList = userProfile.SeenProfiles?.Split(',').ToList() ?? new List<string>();
 
-                            if (!skippedList.Contains(skippedUser.Id))
+                            if (!seenList.Contains(seenUser.Id))
                             {
-                                skippedList.Add(skippedUser.Id);
-                                userProfile.SkippedProfiles = string.Join(",", skippedList);
+                                seenList.Add(seenUser.Id);
+                                userProfile.SeenProfiles = string.Join(",", seenList);
 
-                                // Save the updated profile
                                 await dbContext.SaveChangesAsync();
                             }
                         }
@@ -211,6 +208,7 @@
             CurrentProfileIndex++;
         }
     }
+
 
 
     private List<string> SentRequests = new();
@@ -247,7 +245,7 @@
                     DateTimeReported = DateTime.Now,
                     SenderId = senderId,
                     RecieverId = receiverId,
-                    Status = "Pending"  // Status can be updated as needed
+                    Status = "Pending"
                 };
 
             using (var scope = ServiceScopeFactory.CreateScope())
@@ -255,6 +253,19 @@
                 var dbContext = scope.ServiceProvider.GetRequiredService<DatingAppContext>();
                 dbContext.Report.Add(newReport);
                 await dbContext.SaveChangesAsync();
+
+                // Add reported user to SeenProfiles
+                var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
+                if (userProfile != null)
+                {
+                    var seenList = userProfile.SeenProfiles?.Split(',').ToList() ?? new List<string>();
+                    if (!seenList.Contains(reportedUser.Id))
+                    {
+                        seenList.Add(reportedUser.Id);
+                        userProfile.SeenProfiles = string.Join(",", seenList);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
             }
 
             // Reset report selection
@@ -264,13 +275,20 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error submitting report: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            CurrentProfileIndex++;
+            Console.WriteLine("Saved request to DB1.");
         }
     }
 
+
     private async Task LikeProfile()
     {
-        Logger.LogInformation("User like in.");
+        Logger.LogInformation("User liked a profile.");
 
         if (CurrentProfileIndex >= ProfilesList.Count || isLoading || IsRequestSent(ProfilesList[CurrentProfileIndex].Email))
             return;
@@ -306,6 +324,19 @@
                     value = newRequest.Id.ToString();
                     Console.WriteLine("Saved request to DB.");
                 }
+
+                // Add liked user to SeenProfiles
+                var userProfile = await dbContext.Profile.FirstOrDefaultAsync(p => p.UId == currentUser.Id);
+                if (userProfile != null)
+                {
+                    var seenList = userProfile.SeenProfiles?.Split(',').ToList() ?? new List<string>();
+                    if (!seenList.Contains(receiver.Id))
+                    {
+                        seenList.Add(receiver.Id);
+                        userProfile.SeenProfiles = string.Join(",", seenList);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -319,6 +350,7 @@
             Console.WriteLine("Saved request to DB1.");
         }
     }
+
 
     private bool IsRequestSent(string receiverEmail)
     {
