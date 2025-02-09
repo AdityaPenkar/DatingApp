@@ -696,5 +696,40 @@ textarea {
         background-color: #f1f1f1; /* Highlight row on hover */
     }
 
+    .status-indicator {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+    }
+
+        .status-indicator.accepted {
+            background-color: green; /* Green for Accepted */
+        }
+
+        .status-indicator.rejected {
+            background-color: red; /* Red for Rejected */
+        }
+
+    .accept-btn {
+        background-color: #28a745;
+        color: white;
+        padding: 8px 12px;
+        border: none;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+
+    .reject-btn {
+        background-color: #dc3545;
+        color: white;
+        padding: 8px 12px;
+        border: none;
+        cursor: pointer;
+    }
+
+        .accept-btn:hover, .reject-btn:hover {
+            opacity: 0.8;
+        }
 
 

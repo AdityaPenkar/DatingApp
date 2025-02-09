@@ -22,6 +22,8 @@
                 <th>Reported User Email</th>
                 <th>Reason</th>
                 <th>Date Reported</th>
+                <th>Status</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -34,6 +36,23 @@
                     <td>@report.ReportedUserEmail</td>
                     <td>@report.Reason</td>
                     <td>@report.DateTimeReported.ToString("dd MMM yyyy HH:mm")</td>
+
+                    <td>
+                        @if (string.IsNullOrEmpty(report.Status) || report.Status == "Pending")
+                        {
+                            <button class="accept-btn" @onclick="() => AcceptReport(report.Id)">Accept</button>
+                            <button class="reject-btn" @onclick="() => RejectReport(report.Id)">Reject</button>
+                        }
+                        else if (report.Status == "Accepted")
+                        {
+                            <span class="status-indicator accepted"></span>
+                        }
+                        else if (report.Status == "Rejected")
+                        {
+                            <span class="status-indicator rejected"></span>
+                        }
+                    </td>
+                    
                 </tr>
             }
         </tbody>
@@ -55,27 +74,82 @@ else
             .Join(context.Users, r => r.SenderId, sender => sender.Id, (r, sender) => new { r, sender })
             .Join(context.Users, rs => rs.r.RecieverId, receiver => receiver.Id, (rs, receiver) => new ReportViewModel
                 {
+                    Id = rs.r.Id,
                     ReporterName = rs.sender.FirstName + " " + rs.sender.LastName,
                     ReporterEmail = rs.sender.Email,
                     ReportedUserName = receiver.FirstName + " " + receiver.LastName,
                     ReportedUserEmail = receiver.Email,
                     Reason = rs.r.Reason,
-                    DateTimeReported = rs.r.DateTimeReported
+                    DateTimeReported = rs.r.DateTimeReported,
+                    Status = rs.r.Status
                 })
             .OrderByDescending(r => r.DateTimeReported)
             .ToListAsync();
     }
 
+    private async Task AcceptReport(int reportId)
+    {
+        await UpdateReportStatus(reportId, "Accepted");
+    }
+
+    private async Task RejectReport(int reportId)
+    {
+        await UpdateReportStatus(reportId, "Rejected");
+    }
+
+    private async Task UpdateReportStatus(int reportId, string status)
+    {
+        Console.WriteLine($"Updating Report ID: {reportId} to {status}...");
+
+        using var context = DbFactory.CreateDbContext();
+        var report = await context.Report.FindAsync(reportId);
+        if (report != null)
+        {
+            report.Status = status;
+            await context.SaveChangesAsync();
+        }
+
+        // Refresh the reports list
+        await LoadReports();
+        StateHasChanged(); // Force UI update
+    }
+
+    private async Task LoadReports()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        ReportsList = await context.Report
+            .Join(context.Users, r => r.SenderId, sender => sender.Id, (r, sender) => new { r, sender })
+            .Join(context.Users, rs => rs.r.RecieverId, receiver => receiver.Id, (rs, receiver) => new ReportViewModel
+                {
+                    Id = rs.r.Id,
+                    ReporterName = rs.sender.FirstName + " " + rs.sender.LastName,
+                    ReporterEmail = rs.sender.Email,
+                    ReportedUserName = receiver.FirstName + " " + receiver.LastName,
+                    ReportedUserEmail = receiver.Email,
+                    Reason = rs.r.Reason,
+                    DateTimeReported = rs.r.DateTimeReported,
+                    Status = rs.r.Status
+                })
+            .OrderByDescending(r => r.DateTimeReported)
+            .ToListAsync();
+    }
+
+
+
     private class ReportViewModel
     {
+        public int Id { get; set; }
         public string ReporterName { get; set; }
         public string ReporterEmail { get; set; }
         public string ReportedUserName { get; set; }
         public string ReportedUserEmail { get; set; }
         public string Reason { get; set; }
         public DateTime DateTimeReported { get; set; }
+        public string Status { get; set; }
     }
 }
+
 
 
 
